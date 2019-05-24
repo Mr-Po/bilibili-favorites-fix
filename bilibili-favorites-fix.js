@@ -6,10 +6,14 @@
 // @author       Mr.Po
 // @match        https://space.bilibili.com/*
 // @require      http://code.jquery.com/jquery-1.11.0.min.js
+// @resource iconError https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/error.png
+// @resource iconSuccess https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/success.png
+// @resource iconInfo https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/info.png
 // @connect      biliplus.com
 // @grant        GM_xmlhttpRequest
 // @grant        GM_notification
 // @grant        GM_setClipboard
+// @grant        GM_getResourceURL
 // ==/UserScript==
 
 (function() {
@@ -70,6 +74,8 @@
                     $as.attr("href", "https://www.biliplus.com/video/av" + aid + "/");
                     $as.attr("target", "_blank");
 
+                    addCopyAVCodeButton($(it), aid);
+
                     fixTitleAndPic($(it), $($as[1]), aid);
 
                     $(it).removeClass("disabled");
@@ -81,17 +87,41 @@
         }
     }
 
-    function addCopyAVCode($item) {
+    function addOperation($item, name, fun) {
 
         var $ul = $item.find(".be-dropdown-menu").first();
 
-        // 添加分割线
-        $ul.lastChild().addClass("be-dropdown-item-delimiter");
+        var lastChild = $ul.children().last();
 
-        var $li_copy_av_code = $("<li class=\"be-dropdown-item\">复制av号</li>");
+        // 未添加过扩展
+        if (!lastChild.hasClass('be-dropdown-item-extend')) {
+            lastChild.addClass("be-dropdown-item-delimiter");
+        }
 
-        $li_copy_av_code.onclick(function(){
-            GM_notification()
+        var $li = $("<li class=\"be-dropdown-item be-dropdown-item-extend\">" + name + "</li>");
+
+        $li.click(fun);
+
+        $ul.append($li);
+    }
+
+    function addCopyAVCodeButton($item, aid) {
+
+        addOperation($item, "复制av号", function() {
+
+            GM_setClipboard("av" + aid, "text");
+
+            tipSuccess("av号复制成功！");
+        });
+    }
+
+    function addCopyInfoButton($item, content) {
+
+        addOperation($item, "复制简介", function() {
+
+            GM_setClipboard(content, "text");
+
+            tipSuccess("简介复制成功！");
         });
     }
 
@@ -412,9 +442,30 @@
                     var content = "av：" + aid + "\nP数：" + $media.page + "\n子P：" + titles + "\n简介：" + $media.intro;
 
                     $($a[0]).attr("title", content);
+
+                    addCopyInfoButton($(it), content);
                 });
             }
         });
+    }
+
+    function tip(text, iconName) {
+        GM_notification({
+            text: text,
+            image: GM_getResourceURL(iconName)
+        });
+    }
+
+    function tipInfo(text) {
+        tip(text, "iconInfo");
+    }
+
+    function tipError(text) {
+        tip(text, "iconError");
+    }
+
+    function tipSuccess(text) {
+        tip(text, "iconSuccess");
     }
 
     setInterval(updateFav, space);
