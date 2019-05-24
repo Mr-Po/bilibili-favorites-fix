@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         哔哩哔哩(B站|Bilibili)收藏夹Fix
 // @namespace    http://tampermonkey.net/
-// @version      1.0
+// @version      1.1
 // @description  修复 哔哩哔哩(www.bilibili.com) 失效的收藏。（可查看av号、简介、标题、封面）
 // @author       Mr.Po
 // @match        https://space.bilibili.com/*
