@@ -22,14 +22,14 @@
 
 **（图1）**
 
-![](https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/01.jpg)
+![](https://cdn.jsdelivr.net/gh/Mr-Po/bilibili-favorites-fix/media/01.jpg)
 * * *
 
 **（图2）**
 
-![](https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/02.jpg)
+![](https://cdn.jsdelivr.net/gh/Mr-Po/bilibili-favorites-fix/media/02.jpg)
 * * *
 
 **（图3）**
 
-![](https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/03.jpg)
+![](https://cdn.jsdelivr.net/gh/Mr-Po/bilibili-favorites-fix/media/03.jpg)

@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         哔哩哔哩(B站|Bilibili)收藏夹Fix
 // @namespace    http://tampermonkey.net/
-// @version      1.1
+// @version      1.2
 // @description  修复 哔哩哔哩(www.bilibili.com) 失效的收藏。（可查看av号、简介、标题、封面）
 // @author       Mr.Po
 // @match        https://space.bilibili.com/*
@@ -16,68 +16,77 @@
 // @grant        GM_getResourceURL
 // ==/UserScript==
 
+/*jshint esversion: 8 */
 (function() {
     'use strict';
 
     /**
-     * 失效收藏标题颜色(默认为灰色)
+     * 失效收藏标题颜色(默认为灰色)。
      * @type {String}
      */
-    var invalTitleColor = "#999";
+    const invalTitleColor = "#999";
 
     /**
-     * 是否启用调试模式
-     * 启用后，浏览器控制台会显示此脚本运行时的调试数据
+     * 是否启用调试模式。
+     * 启用后，浏览器控制台会显示此脚本运行时的调试数据。
      * @type {Boolean}
      */
-    var isDebug = false;
+    const isDebug = false;
 
     /**
-     * 重试延迟[秒]
+     * 重试延迟[秒]。
      * @type {Number}
      */
-    var retryDelay = 5;
+    const retryDelay = 5;
 
     /**
-     * 每隔 space 毫秒检查一次，是否有新的微博被加载出来
-     * 此值越小，检查越快；过小会造成浏览器卡顿
+     * 每隔 space [毫秒]检查一次，是否有新的收藏被加载出来。
+     * 此值越小，检查越快；过小会造成浏览器卡顿。
      * @type {Number}
      */
-    var space = 2000;
+    const space = 2000;
+
+    /******************************************************/
 
     /**
      * 收藏夹地址正则
      * @type {RegExp}
      */
-    var favlistRegex = /https:\/\/space\.bilibili\.com\/\d+\/favlist.*/;
+    const favlistRegex = /https:\/\/space\.bilibili\.com\/\d+\/favlist.*/;
 
-    // 修改收藏
-    function updateFav() {
+    /**
+     * 处理收藏
+     */
+    function handleFavorites() {
 
-        var flag = favlistRegex.test(window.location.href);
+        const flag = favlistRegex.test(window.location.href);
 
-        //console.log(flag);
+        if (flag) { // 当前页面是收藏地址
 
-        if (flag) {
-
-            var $lis = $("ul.fav-video-list.content li.small-item.disabled");
+            // 失效收藏节点集
+            const $lis = $("ul.fav-video-list.content li.small-item.disabled");
 
             if ($lis.size() > 0) {
 
-                console.info($lis.size() + "个收藏待修复...");
+                console.info(`${$lis.size()}个收藏待修复...`);
 
                 $lis.each(function(i, it) {
 
-                    var aid = $(it).attr("data-aid");
-                    var $as = $(it).find("a");
+                    const bv = $(it).attr("data-aid");
 
-                    $as.attr("href", "https://www.biliplus.com/video/av" + aid + "/");
+                    const aid = bv2aid(bv);
+
+                    // 多个超链接
+                    const $as = $(it).find("a");
+
+                    $as.attr("href", `https://www.biliplus.com/video/av${aid}/`);
                     $as.attr("target", "_blank");
 
                     addCopyAVCodeButton($(it), aid);
 
                     fixTitleAndPic($(it), $($as[1]), aid);
 
+                    // 移除禁用样式
                     $(it).removeClass("disabled");
                     $as.removeClass("disabled");
                 });
@@ -89,16 +98,16 @@
 
     function addOperation($item, name, fun) {
 
-        var $ul = $item.find(".be-dropdown-menu").first();
+        const $ul = $item.find(".be-dropdown-menu").first();
 
-        var lastChild = $ul.children().last();
+        const lastChild = $ul.children().last();
 
         // 未添加过扩展
         if (!lastChild.hasClass('be-dropdown-item-extend')) {
             lastChild.addClass("be-dropdown-item-delimiter");
         }
 
-        var $li = $("<li class=\"be-dropdown-item be-dropdown-item-extend\">" + name + "</li>");
+        const $li = $(`<li class="be-dropdown-item be-dropdown-item-extend">${name}</li>`);
 
         $li.click(fun);
 
@@ -109,7 +118,7 @@
 
         addOperation($item, "复制av号", function() {
 
-            GM_setClipboard("av" + aid, "text");
+            GM_setClipboard(`av${aid}`, "text");
 
             tipSuccess("av号复制成功！");
         });
@@ -125,17 +134,28 @@
         });
     }
 
-    // 标记失效
+    /**
+     * 标记失效的收藏
+     * @param  {$节点}  $it 当前收藏Item
+     * @param  {$节点}  $a  标题链接
+     */
     function signInval($it, $a) {
 
         // 收藏时间
-        var $pubdate = $it.find("div.meta.pubdate");
+        const $pubdate = $it.find("div.meta.pubdate");
+
+        // 增加 删除线
         $pubdate.attr("style", "text-decoration:line-through");
 
-        $a.attr("style", "text-decoration:line-through;color:" + invalTitleColor + ";");
+        // 增加 删除线 + 置(灰)
+        $a.attr("style", `text-decoration:line-through;color:${invalTitleColor};`);
     }
 
-    // 绑定重新加载
+    /**
+     * 绑定重新加载
+     * @param  {$节点}  $a  标题链接
+     * @param  {函数}   fun 重试方法
+     */
     function bindReload($a, fun) {
 
         $a.text("->手动加载<-");
@@ -150,20 +170,26 @@
         });
     }
 
-    // 再次尝试加载
-    function retryLoad($a, aid, retry, fun) {
+    /**
+     * 再次尝试加载
+     * @param  {$节点}	$a  		标题链接
+     * @param  {数字}	aid  		AV号
+     * @param  {布尔}	delayRetry 	延迟重试
+     * @param  {函数}	fun   		重试方法
+     */
+    function retryLoad($a, aid, delayRetry, fun) {
 
-        console.warn("查询：av" + aid + "，请求过快！");
+        console.warn(`查询：av${aid}，请求过快！`);
 
-        if (retry) { // 手动重试
+        if (delayRetry) { // 延迟绑定
 
-            $a.text("请求过快，请稍后[" + retryDelay + "]s再试！");
+            $a.text(`请求过快，${retryDelay}秒后再试！`);
 
             setTimeout(bindReload, retryDelay * 1000, $a, fun);
 
             countdown($a, retryDelay);
 
-        } else { // 首次
+        } else { // 首次，立即绑定
 
             $a.attr("href", "javascript:void(0);");
 
@@ -171,12 +197,16 @@
         }
     }
 
-    // 加载倒计时
+    /**
+     * 重新绑定倒计时
+     * @param  {$节点}  	$a  	标题链接
+     * @param  {数字} 	second 	秒
+     */
     function countdown($a, second) {
 
         if ($a.text().indexOf("请求过快") === 0) {
 
-            $a.text("请求过快，请稍后[" + second + "]s再试！");
+            $a.text(`请求过快，${second}秒后再试！`);
 
             if (second > 1) {
                 setTimeout(countdown, 1000, $a, second - 1);
@@ -184,50 +214,64 @@
         }
     }
 
-    // 修复成功
-    function fixSuccess($it, $a, aid, title, pic, history) {
+    /**
+     * 修复收藏
+     * @param  {$节点}	$it 	当前收藏Item
+     * @param  {$节点}  	$a  	标题链接
+     * @param  {数字}   	aid 	av号
+     * @param  {字符串} 	title   标题
+     * @param  {字符串} 	pic     海报
+     * @param  {字符串} 	history 历史归档，若无时，使用空字符串
+     */
+    function fixFavorites($it, $a, aid, title, pic, history) {
 
         // 设置标题
         $a.text(title);
         $a.attr("title", $a.text());
 
-        var $as = $it.find("a");
-        $as.attr("href", "https://www.biliplus.com/" + history + "video/av" + aid + "/");
+        // 多个超链接
+        const $as = $it.find("a");
+        $as.attr("href", `https://www.biliplus.com/${history}video/av${aid}/`);
 
         signInval($it, $a);
 
+        // 判断海报链接是否有效，有效时进行替换
         isLoad(pic, function() {
-            var $img = $it.find("img");
+            const $img = $it.find("img");
             $img.attr("src", pic);
         });
     }
 
-    // 修复标题和海报
+    /**
+     * 修复标题和海报
+     * @param  {$节点}  $it 当前收藏Item
+     * @param  {$节点}  $a  标题链接
+     * @param  {数字}   aid av号
+     */
     function fixTitleAndPic($it, $a, aid) {
-
-        if (isDebug) {
-            console.log("fixTitleAndPic");
-        }
 
         $a.text("Loading...");
 
         fixTitleAndPicEnhance3($it, $a, aid);
     }
 
-    // 修复标题和海报 增强 - 0
-    function fixTitleAndPicEnhance0($it, $a, aid, retry) {
-
-        if (isDebug) {
-            console.log("fixTitleAndPicEnhance0");
-        }
+    /**
+     * 修复标题和海报 增强 - 0
+     * 使用公开的API
+     * @param  {$节点}   $it 当前收藏Item
+     * @param  {$节点}   $a  标题链接
+     * @param  {数字}    aid av号
+     * @param  {布尔}    delayRetry 延迟重试
+     */
+    function fixTitleAndPicEnhance0($it, $a, aid, delayRetry) {
 
         GM_xmlhttpRequest({
             method: 'GET',
-            url: "https://www.biliplus.com/api/view?id=" + aid,
+            url: `https://www.biliplus.com/api/view?id=${aid}`,
             responseType: "json",
             onload: function(response) {
 
-                var res = response.response;
+                const res = response.response;
 
                 if (isDebug) {
                     console.log("0---->：");
@@ -237,11 +281,11 @@
                 // 找到了
                 if (res.title) {
 
-                    fixSuccess($it, $a, aid, res.title, res.pic, "");
+                    fixFavorites($it, $a, aid, res.title, res.pic, "");
 
                 } else if (res.code == -503) { // 请求过快
 
-                    retryLoad($a, aid, retry, function() {
+                    retryLoad($a, aid, delayRetry, function() {
                         fixTitleAndPicEnhance0($it, $a, aid, true);
                     });
 
@@ -257,41 +301,50 @@
         });
     }
 
-    // 修复标题和海报 增强 - 1
+    /**
+     * 修复标题和海报 增强 - 1
+     * 使用cache库
+     * @param  {$节点}  $it 当前收藏Item
+     * @param  {$节点}  $a  标题链接
+     * @param  {数字}   aid av号
+     */
     function fixTitleAndPicEnhance1($it, $a, aid) {
-
-        if (isDebug) {
-            console.log("fixTitleAndPicEnhance1");
-        }
 
         GM_xmlhttpRequest({
             method: 'GET',
-            url: "https://www.biliplus.com/all/video/av" + aid + "/",
+            url: `https://www.biliplus.com/all/video/av${aid}/`,
             onload: function(response) {
 
-                //console.log("1---->："+response.responseText);
+                if (isDebug) {
+                    console.log("1---->：");
+                    console.log(response.response);
+                }
 
-                var params = response.responseText.match(/getjson\('(\/api\/view_all.+)'/);
+                const params = response.responseText.match(/getjson\('(\/api\/view_all.+)'/);
 
                 fixTitleAndPicEnhance2($it, $a, aid, params[1]);
             }
         });
     }
 
-    // 修复标题和海报 增强 - 2
-    function fixTitleAndPicEnhance2($it, $a, aid, param, retry) {
-
-        if (isDebug) {
-            console.log("fixTitleAndPicEnhance2");
-        }
+    /**
+     * 修复标题和海报 增强 - 2
+     * 使用cache库，第一段，需与fixTitleAndPicEnhance1连用
+     * @param  {$节点}  	$it 		当前收藏Item
+     * @param  {$节点}  	$a  		标题链接
+     * @param  {数字}   	aid 		av号
+     * @param  {字符串} 	param 		待拼接参数
+     * @param  {布尔}  	delayRetry	延迟重试
+     */
+    function fixTitleAndPicEnhance2($it, $a, aid, param, delayRetry) {
 
         GM_xmlhttpRequest({
             method: 'GET',
-            url: "https://www.biliplus.com" + param,
+            url: `https://www.biliplus.com${param}`,
             responseType: "json",
             onload: function(response) {
 
-                var res = response.response;
+                const res = response.response;
 
                 if (isDebug) {
                     console.log("2---->：");
@@ -301,41 +354,44 @@
                 // 找到了
                 if (res.code === 0) {
 
-                    fixSuccess($it, $a, aid, res.data.info.title, res.data.info.pic, "all/");
+                    fixFavorites($it, $a, aid, res.data.info.title, res.data.info.pic, "all/");
 
                 } else if (res.code == -503) { // 请求过快
 
-                    retryLoad($a, aid, retry, function() {
+                    retryLoad($a, aid, delayRetry, function() {
                         fixTitleAndPicEnhance2($it, $a, aid, param, true);
                     });
 
                 } else { // 未找到
 
-                    $a.text("已失效（" + aid + "）");
+                    $a.text(`已失效（${aid}）`);
                     $a.attr("title", $a.text());
                 }
             }
         });
     }
 
-    // 修复标题和海报 增强 - 3
+    /**
+     * 修复标题和海报 增强 - 3
+     * 模拟常规查询
+     * @param  {$节点}  	$it 当前收藏Item
+     * @param  {$节点}  	$a  标题链接
+     * @param  {数字}   	aid av号
+     */
     function fixTitleAndPicEnhance3($it, $a, aid) {
 
-        if (isDebug) {
-            console.log("fixTitleAndPicEnhance3");
-        }
-
-        var jsonRegex;
+        let jsonRegex;
 
         GM_xmlhttpRequest({
             method: 'GET',
-            url: "https://www.biliplus.com/video/av" + aid + "/",
+            url: `https://www.biliplus.com/video/av${aid}/`,
             onload: function(response) {
 
                 try {
 
                     if (isDebug) {
-                        console.log("3---->：" + response.responseText);
+                        console.log("3---->：");
+                        console.log(response.response);
                     }
 
                     jsonRegex = response.responseText.match(/window\.addEventListener\('DOMContentLoaded',function\(\){view\((.+)\);}\);/);
@@ -344,17 +400,17 @@
                         console.log(jsonRegex);
                     }
 
-                    var jsonStr = jsonRegex[1];
+                    const jsonStr = jsonRegex[1];
 
                     if (isDebug) {
                         console.log(jsonStr);
                     }
 
-                    var res = $.parseJSON(jsonStr);
+                    const res = $.parseJSON(jsonStr);
 
                     if (res.title) { // 存在
 
-                        fixSuccess($it, $a, aid, res.title, res.pic, "");
+                        fixFavorites($it, $a, aid, res.title, res.pic, "");
 
                     } else if (res.code == -503) { // 请求过快
 
@@ -381,7 +437,11 @@
         });
     }
 
-    // 判断一个url是否可以访问
+    /**
+     * 判断一个url是否可以访问
+     * @param  {字符串}  url http地址
+     * @param  {函数}  	fun 有效时的回调
+     */
     function isLoad(url, fun) {
         $.ajax({
             url: url,
@@ -393,12 +453,15 @@
         });
     }
 
-    // 显示详细
+    /**
+     * 显示详细
+     * @param  {$节点} $lis 失效收藏节点集
+     */
     function showDetail($lis) {
 
-        var fidRegex = window.location.href.match(/fid=(\d+)/);
+        const fidRegex = window.location.href.match(/fid=(\d+)/);
 
-        var fid;
+        let fid;
 
         if (fidRegex) {
             fid = fidRegex[1];
@@ -406,40 +469,42 @@
             fid = $("div.fav-item.cur").attr("fid");
         }
 
-        var pn = $("ul.be-pager li.be-pager-item.be-pager-item-active").text();
+        const pn = $("ul.be-pager li.be-pager-item.be-pager-item-active").text();
 
         $.ajax({
-            url: "https://api.bilibili.com/medialist/gateway/base/spaceDetail?media_id=" + fid + "&pn=" + pn + "&ps=20&keyword=&order=mtime&type=0&tid=0&jsonp=jsonp",
+            url: `https://api.bilibili.com/medialist/gateway/base/spaceDetail?media_id=${fid}&pn=${pn}&ps=20&keyword=&order=mtime&type=0&tid=0&jsonp=jsonp`,
             success: function(json) {
 
-                var $medias = json.data.medias;
+                const $medias = json.data.medias;
 
                 $lis.each(function(i, it) {
 
-                    var aid = $(it).attr("data-aid");
+                    const bv = $(it).attr("data-aid");
 
-                    var $mediaF = $medias.filter(function(it) {
-                        if (it.id == aid) {
+                    const $mediaF = $medias.filter(function(it) {
+                        if (it.bvid == bv) {
                             return it;
                         }
                     });
 
-                    var $media = $mediaF[0];
+                    const $media = $mediaF[0];
 
-                    var $a = $(it).find("a");
+                    const $a = $(it).find("a");
 
-                    var titles = "";
+                    let titles = "";
 
                     if ($media.pages) {
 
-                        var $titlesM = $media.pages.map(function(it, i, arry) {
+                        const $titlesM = $media.pages.map(function(it, i, arry) {
                             return it.title;
                         });
 
                         titles = $titlesM.join("、");
                     }
 
-                    var content = "av：" + aid + "\nP数：" + $media.page + "\n子P：" + titles + "\n简介：" + $media.intro;
+                    const aid = bv2aid(bv);
+
+                    const content = `av：${aid}\nP数：${$media.page}\n子P：${titles}\n简介：${$media.intro}`;
 
                     $($a[0]).attr("title", content);
 
@@ -447,6 +512,37 @@
                 });
             }
         });
+    }
+
+    const bvTable = "fZodR9XQDSUm21yCkr6zBqiveYah8bt4xsWpHnJE7jL5VG3guMTKNPAwcF";
+    const bvArray = [
+        { bvIndex: 11, bvTimes: 1 },
+        { bvIndex: 10, bvTimes: 58 },
+        { bvIndex: 3, bvTimes: 3364 },
+        { bvIndex: 8, bvTimes: 195112 },
+        { bvIndex: 4, bvTimes: 11316496 },
+        { bvIndex: 6, bvTimes: 656356768 },
+    ];
+    const bvXor = 177451812;
+    const bvAdd = 8728348608;
+
+
+    /**
+     * BV号转aid
+     * @param  {字符串}	bv BV号
+     * @return {数字}	av号
+     */
+    function bv2aid(bv) {
+
+        const value = bvArray
+            .map((it, i) => {
+                return bvTable.indexOf(bv[it.bvIndex]) * it.bvTimes;
+            })
+            .reduce((total, num) => {
+                return total + num;
+            });
+
+        return (value - bvAdd) ^ bvXor;
     }
 
     function tip(text, iconName) {
@@ -468,5 +564,5 @@
         tip(text, "iconSuccess");
     }
 
-    setInterval(updateFav, space);
+    setInterval(handleFavorites, space);
 })();
