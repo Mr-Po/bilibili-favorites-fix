@@ -1,14 +1,14 @@
 // ==UserScript==
 // @name         哔哩哔哩(B站|Bilibili)收藏夹Fix
 // @namespace    http://tampermonkey.net/
-// @version      1.2
+// @version      1.2.1
 // @description  修复 哔哩哔哩(www.bilibili.com) 失效的收藏。（可查看av号、简介、标题、封面）
 // @author       Mr.Po
 // @match        https://space.bilibili.com/*
-// @require      http://code.jquery.com/jquery-1.11.0.min.js
-// @resource iconError https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/error.png
-// @resource iconSuccess https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/success.png
-// @resource iconInfo https://raw.githubusercontent.com/Mr-Po/bilibili-favorites-fix/master/media/info.png
+// @require      https://cdnjs.cloudflare.com/ajax/libs/jquery/1.11.0/jquery.min.js
+// @resource iconError https://cdn.jsdelivr.net/gh/Mr-Po/bilibili-favorites-fix/media/error.png
+// @resource iconSuccess https://cdn.jsdelivr.net/gh/Mr-Po/bilibili-favorites-fix/media/success.png
+// @resource iconInfo https://cdn.jsdelivr.net/gh/Mr-Po/bilibili-favorites-fix/media/info.png
 // @connect      biliplus.com
 // @grant        GM_xmlhttpRequest
 // @grant        GM_notification
